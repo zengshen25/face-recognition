@@ -49,6 +49,175 @@ H_size = 0.1 * camera.get(4)
 # 相当于mutex锁，用于线程同步
 system_state_lock = 0
 
+'''
+============================================================================================
+以上是初始化
+============================================================================================
+'''
+
+
+
+
+def get_new_face():
+    print("正在从摄像头录入您的人脸信息 \n")
+
+    # 存在目录data就清空，不存在就创建，确保最后存在空的data目录
+    filepath = "data"
+    if not os.path.exists(filepath):
+        os.mkdir(filepath)
+    else:
+        shutil.rmtree(filepath)
+        os.mkdir(filepath)
+
+    # 已经获得的样本数
+    sample_num = 0
+    # 从摄像头读取图片
+    while True:
+
+        global success
+        # 因为要显示在可视化的控件内，所以要用全局的
+        global img
+        success, img = camera.read()
+
+        # 转为灰度图片
+        if success is True:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            break
+
+        # 检测人脸，将每一帧摄像头记录的数据带入OpenCv中，让Classifier判断人脸
+        # 其中gray为要检测的灰度图像，1.3为每次图像尺寸减小的比例，5为minNeighbors
+        face_detector = face_cascade
+        faces = face_detector.detectMultiScale(gray, 1.3, 5)
+
+        # 框选人脸，for循环保证一个能检测的实时动态视频流
+        for (x, y, w, h) in faces:
+            # xy为左上角的坐标,w为宽，h为高，用rectangle为人脸标记画框
+            cv2.rectangle(img, (x, y), (x + w, y + w), (255, 0, 0))
+            # 样本数加1
+            sample_num += 1
+            # 保存图像，把灰度图片看成二维数组来检测人脸区域，这里是保存在data缓冲文件夹内
+            T = Total_face_num
+            cv2.imwrite("./data/User." + str(T) + '.' + str(sample_num) + '.jpg', gray[y:y + h, x:x + w])
+
+        # 表示摄像头拍摄取样的数量,越多效果越好，但获取以及训练的越慢
+        pictur_num = 30
+
+        cv2.waitKey(1)
+        if sample_num > pictur_num:
+            break
+        # 控制台内输出进度条
+        else:
+            l = int(sample_num / pictur_num * 50)
+            r = int((pictur_num - sample_num) / pictur_num * 50)
+            print("\r" + "%{:.1f}".format(sample_num / pictur_num * 100) + "=" * l + "->" + "_" * r, end="")
+            # 控件可视化进度信息
+            var.set("%{:.1f}".format(sample_num / pictur_num * 100))
+            # 刷新控件以实时显示进度
+            window.update()
+
+
+def Train_new_face():
+    print("\n正在训练中")
+    # cv2.destroyAllWindows()
+    path = 'data'
+
+    # 初始化识别的方法
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+
+    # 调用函数并将数据喂给识别器训练
+    faces, ids = get_images_and_labels(path)
+    print('本次用于训练的识别码为:')  # 调试信息
+    print(ids)  # 输出识别码
+
+    # 训练模型  #将输入的所有图片转成四维数组
+    recognizer.train(faces, np.array(ids))
+    # 保存模型
+    print(Total_face_num)
+
+    yml = 'face-data/' +  str(Total_face_num) + ".yml"
+    rec_f = open(yml, "w+")
+    rec_f.close()
+    recognizer.save(yml)
+
+# 创建一个函数，用于从数据集文件夹中获取训练图片,并获取id
+def get_images_and_labels(path):
+    image_paths = [os.path.join(path, f) for f in os.listdir(path)]
+    # 新建连个list用于存放
+    face_samples = []
+    ids = []
+
+    # 遍历图片路径，导入图片和id添加到list中
+    for image_path in image_paths:
+
+        # 通过图片路径将其转换为灰度图片
+        img = Image.open(image_path).convert('L')
+
+        # 将图片转化为数组
+        img_np = np.array(img, 'uint8')
+
+        if os.path.split(image_path)[-1].split(".")[-1] != 'jpg':
+            continue
+
+        # 为了获取id，将图片和路径分裂并获取
+        id = int(os.path.split(image_path)[-1].split(".")[1])
+
+        # 调用熟悉的人脸分类器
+        detector = cv2.CascadeClassifier(r"./resources/haarcascade_frontalface_default.xml")
+
+        faces = detector.detectMultiScale(img_np)
+
+        # 将获取的图片和id添加到list中
+        for (x, y, w, h) in faces:
+            face_samples.append(img_np[y:y + h, x:x + w])
+            ids.append(id)
+    return face_samples, ids
+
+
+def write_config():
+    print("新人脸训练结束")
+    f = open('config.txt', "a")
+    T = Total_face_num
+    data = openpyxl.load_workbook('user.xlsx')
+    # 取第一张表
+    sheet_names = data.sheetnames
+    table = data[sheet_names[0]]
+    table = data.active
+    nrows = table.max_row  # 获得行数
+    ncolumns = table.max_column  # 获得行数
+    table.cell(nrows + 1, 1).value = T
+    name = ""
+
+    for i in range(2, ncolumns + 1):
+        table.cell(nrows + 1, i).value = input("输入" + str(table.cell(1, i).value) + ": ")
+        if i == 2:
+           name = str(table.cell(nrows + 1, i).value)
+
+    f.write(str(T) + " " + name + " \n")
+    f.close()
+    id_dict[T] = name
+
+    data.save('user.xlsx')
+
+    # 这里修改文件的方式是先读入内存，然后修改内存中的数据，最后写回文件
+    f = open('config.txt', 'r+')
+    flist = f.readlines()
+    # flist[0] = str(int(flist[0]) + 1) + " \n"
+    f.close()
+
+    f = open('config.txt', 'w+')
+    f.writelines(flist)
+    f.close()
+
+
+'''
+============================================================================================
+以上是录入新人脸信息功能的实现
+============================================================================================
+'''
+
+
+#方法定义，等待实现
 def f_scan_face():
     pass
 
