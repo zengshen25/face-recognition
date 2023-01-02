@@ -1,18 +1,18 @@
+import cv2
 import numpy as np
 import os
 import shutil
-import cv2
-from PIL import Image, ImageTk
-import openpyxl
 import threading
 import tkinter as tk
+from PIL import Image, ImageTk
+import openpyxl
 
 
-# 读取config文件，第一行代表当前已经储存的人名个数，接下来每一行是（id，name）标签和对应的人名
+# 首先读取config文件，第一行代表当前已经储存的人名个数，接下来每一行是（id，name）标签和对应的人名
 # 字典里存的是id——name键值对
 id_dict = {}
 # 已经被识别有用户名的人脸个数
-Total_face_num = 999
+Total_face_num = 888
 
 
 # 将config文件内的信息读入到字典中
@@ -31,13 +31,16 @@ def init():
 
 init()
 
-# 加载OpenCV人脸检测分类器haarcascade_frontalface_default.xml
+
+
+# 加载OpenCV人脸检测分类器Haar
 face_cascade = cv2.CascadeClassifier(r"./resources/haarcascade_frontalface_default.xml")
 
 # 准备好识别方法LBPH方法
 recognizer = cv2.face.LBPHFaceRecognizer_create()
 
 # 打开标号为0的摄像头
+# 摄像头
 camera = cv2.VideoCapture(0)
 
 # 从摄像头读取照片
@@ -45,17 +48,15 @@ success, img = camera.read()
 W_size = 0.1 * camera.get(3)
 H_size = 0.1 * camera.get(4)
 
- # 标志系统状态的量 0表示无子线程在运行 1表示正在刷脸 2表示正在录入新面孔。
+system_state_lock = 0  # 标志系统状态的量 0表示无子线程在运行 1表示正在刷脸 2表示正在录入新面孔。
 # 相当于mutex锁，用于线程同步
-system_state_lock = 0
+
 
 '''
 ============================================================================================
 以上是初始化
 ============================================================================================
 '''
-
-
 
 
 def get_new_face():
@@ -140,7 +141,11 @@ def Train_new_face():
     rec_f.close()
     recognizer.save(yml)
 
+    # recog.save('aaa.yml')
+
+
 # 创建一个函数，用于从数据集文件夹中获取训练图片,并获取id
+# 注意图片的命名格式为User.id.sampleNum
 def get_images_and_labels(path):
     image_paths = [os.path.join(path, f) for f in os.listdir(path)]
     # 新建连个list用于存放
@@ -216,76 +221,6 @@ def write_config():
 ============================================================================================
 '''
 
-
-#方法定义，等待实现
-def f_scan_face():
-    pass
-
-
-def f_rec_face():
-    pass
-
-def f_exit():
-    pass
-
-
-window = tk.Tk()
-# 窗口标题
-window.title('Cheney\' Face_rec 3.0')
-# 这里的乘是小x
-window.geometry('1000x500')
-# 在图形界面上设定标签，类似于一个提示窗口的作用
-var = tk.StringVar()
-l = tk.Label(window, textvariable=var, bg='#dee3e9', fg='black', font=('Arial', 12), width=50, height=4)
-# 说明： bg为背景，fg为字体颜色，font为字体，width为长，height为高，这里的长和高是字符的长和高，比如height=2,就是标签有2个字符这么高
-l.pack()  # 放置l控件
-
-# 在窗口界面设置放置Button按键并绑定处理函数
-button_a = tk.Button(window, text='开始刷脸', font=('Arial', 12), width=10, height=2, command=f_scan_face)
-button_a.place(x=800, y=120)
-
-button_b = tk.Button(window, text='录入人脸', font=('Arial', 12), width=10, height=2, command=f_rec_face)
-button_b.place(x=800, y=220)
-
-button_b = tk.Button(window, text='退出', font=('Arial', 12), width=10, height=2, command=f_exit)
-button_b.place(x=800, y=320)
-
-panel = tk.Label(window, width=500, height=350)  # 摄像头模块大小
-panel.place(x=10, y=100)  # 摄像头模块的位置
-window.config(cursor="arrow")
-
-# 这是我自己写的列表控件样式
-listbox1 = tk.Listbox(window, borderwidth=0, activestyle='none', fg='black', background='#f0f0f0', font=18,
-                      highlightthickness=7)
-# 设置控件不可点击
-# listbox1.config(state='disabled')
-listbox1.pack(side='right', padx=228, pady=20)
-
-
-def video_loop():  # 用于在label内动态展示摄像头内容（摄像头嵌入控件）
-    # success, img = camera.read()  # 从摄像头读取照片
-    global success
-    global img
-    if success:
-        cv2.waitKey(1)
-        cv2image = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
-        current_image = Image.fromarray(cv2image)  # 将图像转换成Image对象
-        imgtk = ImageTk.PhotoImage(image=current_image)
-        panel.imgtk = imgtk
-        panel.config(image=imgtk)
-        window.after(1, video_loop)
-
-
-video_loop()
-
-#  窗口循环，用于显示
-window.mainloop()
-
-'''
-============================================================================================
-以上是关于界面的设计
-============================================================================================
-'''
 
 def scan_face():
     # 使用之前训练好的模型
@@ -385,5 +320,110 @@ def scan_face():
 '''
 ============================================================================================
 以上是关于刷脸功能的设计
+============================================================================================
+'''
+
+
+# 等待实现多线程
+def f_scan_face_thread():
+    pass
+
+
+def f_scan_face():
+    # 重置上次留下的信息
+    var_content.set('')
+    photo2 = tk.PhotoImage(file="user-img/" + "0.png")  # file：t图片路径
+    img_label = tk.Label(window, image=photo2, width=180, height=180)  # 把图片整合到标签类中
+    img_label.place(x=568, y=140)  # 自动对齐
+
+
+    global system_state_lock
+    if system_state_lock == 1:
+        print("阻塞，因为正在刷脸")
+        return 0
+    elif system_state_lock == 2:  # 如果正在录入新面孔就阻塞
+        print("\n刷脸被录入面容阻塞\n" "")
+        return 0
+    system_state_lock = 1
+    p = threading.Thread(target=f_scan_face_thread)
+    p.setDaemon(True)  # 把线程P设置为守护线程 若主线程退出 P也跟着退出
+    p.start()
+
+
+def f_rec_face_thread():
+    pass
+
+def f_rec_face():
+    pass
+
+def f_exit():  # 退出按钮
+    exit()
+
+
+'''
+============================================================================================
+以上是关于多线程的设计
+============================================================================================
+'''
+
+window = tk.Tk()
+window.title('人脸识别考勤算法设计与实现')   # 窗口标题
+window.geometry('1000x610')  # 这里的乘是小x
+
+
+
+
+
+# 在图形界面上设定标签，类似于一个提示窗口的作用
+var = tk.StringVar()
+l = tk.Label(window, textvariable=var, bg='#dee3e9', fg='black', font=('Arial', 12), width=50, height=4)
+# 说明： bg为背景，fg为字体颜色，font为字体，width为长，height为高，这里的长和高是字符的长和高，比如height=2,就是标签有2个字符这么高
+l.pack()  # 放置l控件
+
+# 这是我自己写的列表控件样式
+var_content = tk.StringVar()
+button_a = tk.Label(window, justify='left',   textvariable=var_content, font=('Arial', 16), width=70, height=20)
+button_a.place(x=220, y=180)
+
+# 在窗口界面设置放置Button按键并绑定处理函数
+button_a = tk.Button(window, text='开始刷脸', font=('Arial', 12), width=10, height=2, command=f_scan_face)
+button_a.place(x=800, y=200)
+
+button_b = tk.Button(window, text='录入人脸', font=('Arial', 12), width=10, height=2, command=f_rec_face)
+button_b.place(x=800, y=300)
+
+button_b = tk.Button(window, text='退出', font=('Arial', 12), width=10, height=2, command=f_exit)
+button_b.place(x=800, y=400)
+
+
+
+panel = tk.Label(window, width=500, height=350)  # 摄像头模块大小
+panel.place(x=10, y=140)  # 摄像头模块的位置
+window.config(cursor="arrow")
+
+
+
+def video_loop():  # 用于在label内动态展示摄像头内容（摄像头嵌入控件）
+    # success, img = camera.read()  # 从摄像头读取照片
+    global success
+    global img
+    if success:
+        cv2.waitKey(1)
+        cv2image = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
+        current_image = Image.fromarray(cv2image)  # 将图像转换成Image对象
+        imgtk = ImageTk.PhotoImage(image=current_image)
+        panel.imgtk = imgtk
+        panel.config(image=imgtk)
+        window.after(1, video_loop)
+
+
+video_loop()
+
+#  窗口循环，用于显示
+window.mainloop()
+
+'''
+============================================================================================
+以上是关于界面的设计
 ============================================================================================
 '''
