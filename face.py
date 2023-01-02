@@ -286,3 +286,104 @@ window.mainloop()
 以上是关于界面的设计
 ============================================================================================
 '''
+
+def scan_face():
+    # 使用之前训练好的模型
+    for i in range(Total_face_num):  # 每个识别器都要用
+        i += 1
+        yml = './face-data/' +  str(i) + ".yml"
+        # print("\n本次:" + yml)  # 调试信息
+        print(yml)
+        recognizer.read(yml)
+
+        ave_poss = 0
+        for times in range(10):  # 每个识别器扫描十遍
+            times += 1
+            cur_poss = 0
+            global success
+            global img
+
+            global system_state_lock
+            while system_state_lock == 2:  # 如果正在录入新面孔就阻塞
+                print("\r刷脸被录入面容阻塞", end="")
+                pass
+
+            success, img = camera.read()
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # 识别人脸
+            faces = face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.2,
+                minNeighbors=5,
+                minSize=(int(W_size), int(H_size))
+            )
+            # 进行校验
+            for (x, y, w, h) in faces:
+
+                # global system_state_lock
+                while system_state_lock == 2:  # 如果正在录入新面孔就阻塞
+                    print("\r刷脸被录入面容阻塞", end="")
+                    pass
+                # 这里调用Cv2中的rectangle函数 在人脸周围画一个矩形
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                # 调用分类器的预测函数，接收返回值标签和置信度
+                idnum, confidence = recognizer.predict(gray[y:y + h, x:x + w])
+                conf = confidence
+                # 计算出一个检验结果
+                if confidence < 100:  # 可以识别出已经训练的对象——直接输出姓名在屏幕上
+                    if idnum in id_dict:
+                        user_name = id_dict[idnum]
+                    else:
+                        # print("无法识别的ID:{}\t".format(idnum), end="")
+                        user_name = "Untagged user:" + str(idnum)
+                    confidence = "{0}%", format(round(100 - confidence))
+                else:  # 无法识别此对象，那么就开始训练
+                    user_name = "unknown"
+                    # print("检测到陌生人脸\n")
+
+                    # cv2.destroyAllWindows()
+                    # global Total_face_num
+                    # Total_face_num += 1
+                    # get_new_face()  # 采集新人脸
+                    # Train_new_face()  # 训练采集到的新人脸
+                    # write_config()  # 修改配置文件
+                    # recognizer.read('aaa.yml')  # 读取新识别器
+
+                # 加载一个字体用于输出识别对象的信息
+                font = cv2.FONT_HERSHEY_SIMPLEX
+
+                # 输出检验结果以及用户名
+                cv2.putText(img, str(user_name), (x + 5, y - 5), font, 1, (0, 0, 255), 1)
+
+                cv2.putText(img, str(confidence), (x + 5, y + h - 5), font, 1, (0, 0, 0), 1)
+
+                # 展示结果
+                # cv2.imshow('camera', img)
+
+                # print("conf=" + str(conf), end="\t")
+                if 15 > conf > 0:
+                    cur_poss = 1  # 表示可以识别
+                elif 60 > conf > 35:
+                    cur_poss = 1  # 表示可以识别
+                else:
+                    cur_poss = 0  # 表示不可以识别
+
+            k = cv2.waitKey(1)
+            if k == 27:
+                # cam.release()  # 释放资源
+                cv2.destroyAllWindows()
+                break
+
+            ave_poss += cur_poss
+
+        if ave_poss >= 5:  # 有一半以上识别说明可行则返回
+            return i
+
+    return 0  # 全部过一遍还没识别出说明无法识别
+
+
+'''
+============================================================================================
+以上是关于刷脸功能的设计
+============================================================================================
+'''
