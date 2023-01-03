@@ -324,7 +324,6 @@ def scan_face():
 '''
 
 
-# 等待实现多线程
 def f_scan_face_thread():
     pass
 
@@ -338,6 +337,7 @@ def f_scan_face():
 
 
     global system_state_lock
+    # print("\n当前锁的值为：" + str(system_state_lock))
     if system_state_lock == 1:
         print("阻塞，因为正在刷脸")
         return 0
@@ -353,8 +353,23 @@ def f_scan_face():
 def f_rec_face_thread():
     pass
 
+# 点击录入人脸的按钮触发的函数
 def f_rec_face():
-    pass
+    global system_state_lock
+    # print("当前锁的值为：" + str(system_state_lock))
+    if system_state_lock == 2:
+        print("阻塞，因为正在录入面容")
+        return 0
+    else:
+        system_state_lock = 2  # 修改system_state_lock
+        print("改为2", end="")
+        # print("当前锁的值为：" + str(system_state_lock))
+
+    p = threading.Thread(target=f_rec_face_thread)
+    p.setDaemon(True)  # 把线程P设置为守护线程 若主线程退出 P也跟着退出
+    p.start()
+    # tk.Tk().update()
+
 
 def f_exit():  # 退出按钮
     exit()
