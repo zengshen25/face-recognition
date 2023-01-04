@@ -274,15 +274,6 @@ def scan_face():
                     confidence = "{0}%", format(round(100 - confidence))
                 else:  # 无法识别此对象，那么就开始训练
                     user_name = "unknown"
-                    # print("检测到陌生人脸\n")
-
-                    # cv2.destroyAllWindows()
-                    # global Total_face_num
-                    # Total_face_num += 1
-                    # get_new_face()  # 采集新人脸
-                    # Train_new_face()  # 训练采集到的新人脸
-                    # write_config()  # 修改配置文件
-                    # recognizer.read('aaa.yml')  # 读取新识别器
 
                 # 加载一个字体用于输出识别对象的信息
                 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -311,10 +302,12 @@ def scan_face():
 
             ave_poss += cur_poss
 
-        if ave_poss >= 5:  # 有一半以上识别说明可行则返回
+        # 有一半以上识别说明可行则返回
+        if ave_poss >= 5:
             return i
 
-    return 0  # 全部过一遍还没识别出说明无法识别
+    # 全部过一遍还没识别出说明无法识别
+    return 0
 
 
 '''
@@ -325,15 +318,62 @@ def scan_face():
 
 
 def f_scan_face_thread():
-    pass
+    # 使用之前训练好的模型
+    # recognizer.read('aaa.yml')
+    var.set('刷脸')
+    ans = scan_face()
+    if ans == 0:
+        print("最终结果：无法识别")
+        var.set("最终结果：无法识别")
+
+    else:
+        ans_name = "最终结果：" + id_dict[ans]
+        print(ans_name)
+
+        print(ans)
+
+        wb = openpyxl.load_workbook('user.xlsx')
+        sheet = wb['Sheet1']
+        cell = sheet['A1']
+        ans_name.strip()
+        print("用户信息为：")
+        content1 = ["编号: ",	"姓名: ",	"部门: ",	"职位: ",	"年龄: "]
+        i = 0
+
+        content = ""
+        for k in range(1, sheet.max_row + 1):
+            if sheet.cell(row=k, column=1).value == ans:
+                for c in range(1, sheet.max_column + 1):
+                    content = content + content1[i] + '  '+str(sheet.cell(row=k, column=c).value) + "\n"
+                    i = i + 1
+        print()
+
+        var.set(ans_name)
+
+        var_content.set(content)
+        print(var_content)
+
+
+        global  photo2
+        photo2 = tk.PhotoImage(file="user-img/" + str(ans) + ".png")  # file：t图片路径
+        img_label = tk.Label(window, image=photo2, width=180, height=180)  # 把图片整合到标签类中
+        img_label.place(x=568, y=140)  # 自动对齐
+
+    global system_state_lock
+
+    # print("锁被释放0")
+    system_state_lock = 0  # 修改system_state_lock,释放资源
 
 
 def f_scan_face():
     # 重置上次留下的信息
     var_content.set('')
-    photo2 = tk.PhotoImage(file="user-img/" + "0.png")  # file：t图片路径
-    img_label = tk.Label(window, image=photo2, width=180, height=180)  # 把图片整合到标签类中
-    img_label.place(x=568, y=140)  # 自动对齐
+    # file：t图片路径
+    photo2 = tk.PhotoImage(file="user-img/" + "0.png")
+    # 把图片整合到标签类中
+    img_label = tk.Label(window, image=photo2, width=180, height=180)
+    # 自动对齐
+    img_label.place(x=568, y=140)
 
 
     global system_state_lock
@@ -346,7 +386,8 @@ def f_scan_face():
         return 0
     system_state_lock = 1
     p = threading.Thread(target=f_scan_face_thread)
-    p.setDaemon(True)  # 把线程P设置为守护线程 若主线程退出 P也跟着退出
+    # 把线程P设置为守护线程 若主线程退出 P也跟着退出
+    p.setDaemon(True)
     p.start()
 
 
@@ -361,25 +402,22 @@ def f_rec_face():
         print("阻塞，因为正在录入面容")
         return 0
     else:
-        system_state_lock = 2  # 修改system_state_lock
+        # 修改system_state_lock
+        system_state_lock = 2
         print("改为2", end="")
-        # print("当前锁的值为：" + str(system_state_lock))
 
     p = threading.Thread(target=f_rec_face_thread)
-    p.setDaemon(True)  # 把线程P设置为守护线程 若主线程退出 P也跟着退出
+    # 把线程P设置为守护线程 若主线程退出 P也跟着退出
+    p.setDaemon(True)
     p.start()
-    # tk.Tk().update()
+
 
 
 def f_exit():  # 退出按钮
     exit()
 
 
-'''
-============================================================================================
-以上是关于多线程的设计
-============================================================================================
-'''
+
 
 window = tk.Tk()
 window.title('人脸识别考勤算法设计与实现')   # 窗口标题
@@ -387,13 +425,12 @@ window.geometry('1000x610')  # 这里的乘是小x
 
 
 
-
-
 # 在图形界面上设定标签，类似于一个提示窗口的作用
 var = tk.StringVar()
 l = tk.Label(window, textvariable=var, bg='#dee3e9', fg='black', font=('Arial', 12), width=50, height=4)
 # 说明： bg为背景，fg为字体颜色，font为字体，width为长，height为高，这里的长和高是字符的长和高，比如height=2,就是标签有2个字符这么高
-l.pack()  # 放置l控件
+# 放置l控件
+l.pack()
 
 # 这是我自己写的列表控件样式
 var_content = tk.StringVar()
@@ -417,8 +454,9 @@ panel.place(x=10, y=140)  # 摄像头模块的位置
 window.config(cursor="arrow")
 
 
+# 用于在label内动态展示摄像头内容（摄像头嵌入控件）
 
-def video_loop():  # 用于在label内动态展示摄像头内容（摄像头嵌入控件）
+def video_loop():
     # success, img = camera.read()  # 从摄像头读取照片
     global success
     global img
@@ -437,8 +475,3 @@ video_loop()
 #  窗口循环，用于显示
 window.mainloop()
 
-'''
-============================================================================================
-以上是关于界面的设计
-============================================================================================
-'''
