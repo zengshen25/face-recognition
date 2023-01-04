@@ -392,7 +392,25 @@ def f_scan_face():
 
 
 def f_rec_face_thread():
-    pass
+    var.set('录入')
+    cv2.destroyAllWindows()
+    global Total_face_num
+    Total_face_num += 1
+    get_new_face()  # 采集新人脸
+    print("采集完毕，开始训练")
+    global system_state_lock  # 采集完就可以解开锁
+    # print("锁被释放0")
+    system_state_lock = 0
+
+    Train_new_face()  # 训练采集到的新人脸
+    write_config()  # 修改配置文件
+
+#    recognizer.read('aaa.yml')  # 读取新识别器
+
+# global system_state_lock
+# print("锁被释放0")
+# system_state_lock = 0  # 修改system_state_lock,释放资源
+
 
 # 点击录入人脸的按钮触发的函数
 def f_rec_face():
@@ -413,7 +431,8 @@ def f_rec_face():
 
 
 
-def f_exit():  # 退出按钮
+ # 退出按钮
+def f_exit():
     exit()
 
 
