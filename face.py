@@ -7,7 +7,6 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import openpyxl
 
-
 # 首先读取config文件，第一行代表当前已经储存的人名个数，接下来每一行是（id，name）标签和对应的人名
 # 字典里存的是id——name键值对
 id_dict = {}
@@ -29,9 +28,8 @@ def init():
         id_dict[int(id_name[0])] = id_name[1]
     f.close()
 
+
 init()
-
-
 
 # 加载OpenCV人脸检测分类器Haar
 face_cascade = cv2.CascadeClassifier(r"./resources/haarcascade_frontalface_default.xml")
@@ -40,7 +38,6 @@ face_cascade = cv2.CascadeClassifier(r"./resources/haarcascade_frontalface_defau
 recognizer = cv2.face.LBPHFaceRecognizer_create()
 
 # 打开标号为0的摄像头
-# 摄像头
 camera = cv2.VideoCapture(0)
 
 # 从摄像头读取照片
@@ -48,15 +45,33 @@ success, img = camera.read()
 W_size = 0.1 * camera.get(3)
 H_size = 0.1 * camera.get(4)
 
-system_state_lock = 0  # 标志系统状态的量 0表示无子线程在运行 1表示正在刷脸 2表示正在录入新面孔。
+# 标志系统状态的量 0表示无子线程在运行 1表示正在刷脸 2表示正在录入新面孔。
 # 相当于mutex锁，用于线程同步
+system_state_lock = 0
 
 
-'''
-============================================================================================
-以上是初始化
-============================================================================================
-'''
+def Train_new_face():
+    print("\n正在训练中")
+    # cv2.destroyAllWindows()
+    path = 'data'
+
+    # 初始化识别的方法
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+
+    # 调用函数并将数据喂给识别器训练
+    faces, ids = get_images_and_labels(path)
+    print('本次用于训练的识别码为:')  # 调试信息
+    print(ids)  # 输出识别码
+
+    # 训练模型  #将输入的所有图片转成四维数组
+    recognizer.train(faces, np.array(ids))
+    # 保存模型
+    print(Total_face_num)
+
+    yml = 'face-data/' + str(Total_face_num) + ".yml"
+    rec_f = open(yml, "w+")
+    rec_f.close()
+    recognizer.save(yml)
 
 
 def get_new_face():
@@ -118,32 +133,6 @@ def get_new_face():
             window.update()
 
 
-def Train_new_face():
-    print("\n正在训练中")
-    # cv2.destroyAllWindows()
-    path = 'data'
-
-    # 初始化识别的方法
-    recognizer = cv2.face.LBPHFaceRecognizer_create()
-
-    # 调用函数并将数据喂给识别器训练
-    faces, ids = get_images_and_labels(path)
-    print('本次用于训练的识别码为:')  # 调试信息
-    print(ids)  # 输出识别码
-
-    # 训练模型  #将输入的所有图片转成四维数组
-    recognizer.train(faces, np.array(ids))
-    # 保存模型
-    print(Total_face_num)
-
-    yml = 'face-data/' +  str(Total_face_num) + ".yml"
-    rec_f = open(yml, "w+")
-    rec_f.close()
-    recognizer.save(yml)
-
-    # recog.save('aaa.yml')
-
-
 # 创建一个函数，用于从数据集文件夹中获取训练图片,并获取id
 # 注意图片的命名格式为User.id.sampleNum
 def get_images_and_labels(path):
@@ -180,59 +169,46 @@ def get_images_and_labels(path):
 
 
 def write_config():
-    print("新人脸训练结束")
+    print("新的人脸训练结束")
     f = open('config.txt', "a")
     T = Total_face_num
     data = openpyxl.load_workbook('user.xlsx')
-    # 取第一张表
     sheet_names = data.sheetnames
     table = data[sheet_names[0]]
     table = data.active
-    nrows = table.max_row  # 获得行数
-    ncolumns = table.max_column  # 获得行数
+    # 获得行数
+    nrows = table.max_row
+    # 获得列数
+    ncolumns = table.max_column
     table.cell(nrows + 1, 1).value = T
     name = ""
-
     for i in range(2, ncolumns + 1):
         table.cell(nrows + 1, i).value = input("输入" + str(table.cell(1, i).value) + ": ")
         if i == 2:
-           name = str(table.cell(nrows + 1, i).value)
-
+            name = str(table.cell(nrows + 1, i).value)
     f.write(str(T) + " " + name + " \n")
     f.close()
     id_dict[T] = name
-
     data.save('user.xlsx')
-
     # 这里修改文件的方式是先读入内存，然后修改内存中的数据，最后写回文件
     f = open('config.txt', 'r+')
     flist = f.readlines()
-    # flist[0] = str(int(flist[0]) + 1) + " \n"
     f.close()
-
     f = open('config.txt', 'w+')
     f.writelines(flist)
     f.close()
 
-
-'''
-============================================================================================
-以上是录入新人脸信息功能的实现
-============================================================================================
-'''
-
-
-def scan_face():
+def face_swiping():
     # 使用之前训练好的模型
     for i in range(Total_face_num):  # 每个识别器都要用
         i += 1
-        yml = './face-data/' +  str(i) + ".yml"
-        # print("\n本次:" + yml)  # 调试信息
+        yml = './face-data/' + str(i) + ".yml"
         print(yml)
         recognizer.read(yml)
 
         ave_poss = 0
-        for times in range(10):  # 每个识别器扫描十遍
+        # 每个识别器扫描十遍
+        for times in range(10):
             times += 1
             cur_poss = 0
             global success
@@ -255,11 +231,10 @@ def scan_face():
             # 进行校验
             for (x, y, w, h) in faces:
 
-                # global system_state_lock
                 while system_state_lock == 2:  # 如果正在录入新面孔就阻塞
                     print("\r刷脸被录入面容阻塞", end="")
                     pass
-                # 这里调用Cv2中的rectangle函数 在人脸周围画一个矩形
+                # 这里c
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 # 调用分类器的预测函数，接收返回值标签和置信度
                 idnum, confidence = recognizer.predict(gray[y:y + h, x:x + w])
@@ -269,115 +244,78 @@ def scan_face():
                     if idnum in id_dict:
                         user_name = id_dict[idnum]
                     else:
-                        # print("无法识别的ID:{}\t".format(idnum), end="")
                         user_name = "Untagged user:" + str(idnum)
                     confidence = "{0}%", format(round(100 - confidence))
                 else:  # 无法识别此对象，那么就开始训练
                     user_name = "unknown"
-
                 # 加载一个字体用于输出识别对象的信息
                 font = cv2.FONT_HERSHEY_SIMPLEX
-
                 # 输出检验结果以及用户名
                 cv2.putText(img, str(user_name), (x + 5, y - 5), font, 1, (0, 0, 255), 1)
-
                 cv2.putText(img, str(confidence), (x + 5, y + h - 5), font, 1, (0, 0, 0), 1)
-
-                # 展示结果
-                # cv2.imshow('camera', img)
-
-                # print("conf=" + str(conf), end="\t")
                 if 15 > conf > 0:
-                    cur_poss = 1  # 表示可以识别
+                    # 表示可以识别
+                    cur_poss = 1
                 elif 60 > conf > 35:
-                    cur_poss = 1  # 表示可以识别
+                    # 表示可以识别
+                    cur_poss = 1
                 else:
-                    cur_poss = 0  # 表示不可以识别
-
+                    # 表示不可以识别
+                    cur_poss = 0
             k = cv2.waitKey(1)
             if k == 27:
-                # cam.release()  # 释放资源
                 cv2.destroyAllWindows()
                 break
-
             ave_poss += cur_poss
-
         # 有一半以上识别说明可行则返回
         if ave_poss >= 5:
             return i
-
     # 全部过一遍还没识别出说明无法识别
     return 0
 
 
-'''
-============================================================================================
-以上是关于刷脸功能的设计
-============================================================================================
-'''
 
-
-def f_scan_face_thread():
-    # 使用之前训练好的模型
-    # recognizer.read('aaa.yml')
+def scan_face_recognition_thread():
     var.set('刷脸')
-    ans = scan_face()
+    ans = face_swiping()
     if ans == 0:
         print("最终结果：无法识别")
         var.set("最终结果：无法识别")
-
     else:
         ans_name = "最终结果：" + id_dict[ans]
-        print(ans_name)
-
         print(ans)
-
         wb = openpyxl.load_workbook('user.xlsx')
         sheet = wb['Sheet1']
-        cell = sheet['A1']
         ans_name.strip()
         print("用户信息为：")
-        content1 = ["编号: ",	"姓名: ",	"部门: ",	"职位: ",	"年龄: "]
+        content1 = ["编号: ", "姓名: ", "部门: ", "职位: ", "年龄: "]
         i = 0
-
         content = ""
         for k in range(1, sheet.max_row + 1):
             if sheet.cell(row=k, column=1).value == ans:
                 for c in range(1, sheet.max_column + 1):
-                    content = content + content1[i] + '  '+str(sheet.cell(row=k, column=c).value) + "\n"
+                    content = content + content1[i] + '  ' + str(sheet.cell(row=k, column=c).value) + "\n"
                     i = i + 1
-        print()
-
         var.set(ans_name)
-
         var_content.set(content)
-        print(var_content)
-
-
-        global  photo2
-        photo2 = tk.PhotoImage(file="user-img/" + str(ans) + ".png")  # file：t图片路径
-        img_label = tk.Label(window, image=photo2, width=180, height=180)  # 把图片整合到标签类中
-        img_label.place(x=568, y=140)  # 自动对齐
-
+        global photo2
+        photo2 = tk.PhotoImage(file="user-img/" + str(ans) + ".png")
+        # 把图片整合到标签类中
+        img_label = tk.Label(window, image=photo2, width=180, height=180)
+        # 自动对齐
+        img_label.place(x=568, y=140)
     global system_state_lock
+    # 修改system_state_lock,释放资源
+    system_state_lock = 0
 
-    # print("锁被释放0")
-    system_state_lock = 0  # 修改system_state_lock,释放资源
 
-
-def f_scan_face():
+def scan_face_recognition():
     # 重置上次留下的信息
     var_content.set('')
-    # file：t图片路径
-    photo2 = tk.PhotoImage(file="user-img/" + "0.png")
-    # 把图片整合到标签类中
+    photo2 = tk.PhotoImage(file="user-img/" + "测试.png")
     img_label = tk.Label(window, image=photo2, width=180, height=180)
-    # 自动对齐
     img_label.place(x=568, y=140)
-
-
     global system_state_lock
-    # print("\n当前锁的值为：" + str(system_state_lock))
     if system_state_lock == 1:
         print("阻塞，因为正在刷脸")
         return 0
@@ -385,112 +323,101 @@ def f_scan_face():
         print("\n刷脸被录入面容阻塞\n" "")
         return 0
     system_state_lock = 1
-    p = threading.Thread(target=f_scan_face_thread)
+    p = threading.Thread(target=scan_face_recognition_thread)
     # 把线程P设置为守护线程 若主线程退出 P也跟着退出
     p.setDaemon(True)
     p.start()
 
 
-def f_rec_face_thread():
+def enter_face_recognition_thread():
     var.set('录入')
     cv2.destroyAllWindows()
     global Total_face_num
     Total_face_num += 1
-    get_new_face()  # 采集新人脸
+    # 采集新人脸
+    get_new_face()
     print("采集完毕，开始训练")
-    global system_state_lock  # 采集完就可以解开锁
+    # 采集完就可以解开锁
+    global system_state_lock
     # print("锁被释放0")
     system_state_lock = 0
-
-    Train_new_face()  # 训练采集到的新人脸
-    write_config()  # 修改配置文件
-
-#    recognizer.read('aaa.yml')  # 读取新识别器
-
-# global system_state_lock
-# print("锁被释放0")
-# system_state_lock = 0  # 修改system_state_lock,释放资源
+    # 训练采集到的新人脸
+    Train_new_face()
+    # 修改配置文件
+    write_config()
 
 
 # 点击录入人脸的按钮触发的函数
-def f_rec_face():
+def enter_face_recognition():
     global system_state_lock
-    # print("当前锁的值为：" + str(system_state_lock))
     if system_state_lock == 2:
         print("阻塞，因为正在录入面容")
         return 0
     else:
-        # 修改system_state_lock
-        system_state_lock = 2
+        system_state_lock = 2  # 修改system_state_lock
         print("改为2", end="")
+        # print("当前锁的值为：" + str(system_state_lock))
 
-    p = threading.Thread(target=f_rec_face_thread)
+    p = threading.Thread(target=enter_face_recognition_thread)
     # 把线程P设置为守护线程 若主线程退出 P也跟着退出
     p.setDaemon(True)
     p.start()
 
 
-
- # 退出按钮
-def f_exit():
+# 退出按钮
+def face_button_exit():
     exit()
 
 
 
-
-window = tk.Tk()
-window.title('人脸识别考勤算法设计与实现')   # 窗口标题
-window.geometry('1000x610')  # 这里的乘是小x
-
-
-
-# 在图形界面上设定标签，类似于一个提示窗口的作用
-var = tk.StringVar()
-l = tk.Label(window, textvariable=var, bg='#dee3e9', fg='black', font=('Arial', 12), width=50, height=4)
-# 说明： bg为背景，fg为字体颜色，font为字体，width为长，height为高，这里的长和高是字符的长和高，比如height=2,就是标签有2个字符这么高
-# 放置l控件
-l.pack()
-
-# 这是我自己写的列表控件样式
-var_content = tk.StringVar()
-button_a = tk.Label(window, justify='left',   textvariable=var_content, font=('Arial', 16), width=70, height=20)
-button_a.place(x=220, y=180)
-
-# 在窗口界面设置放置Button按键并绑定处理函数
-button_a = tk.Button(window, text='开始刷脸', font=('Arial', 12), width=10, height=2, command=f_scan_face)
-button_a.place(x=800, y=200)
-
-button_b = tk.Button(window, text='录入人脸', font=('Arial', 12), width=10, height=2, command=f_rec_face)
-button_b.place(x=800, y=300)
-
-button_b = tk.Button(window, text='退出', font=('Arial', 12), width=10, height=2, command=f_exit)
-button_b.place(x=800, y=400)
-
-
-
-panel = tk.Label(window, width=500, height=350)  # 摄像头模块大小
-panel.place(x=10, y=140)  # 摄像头模块的位置
-window.config(cursor="arrow")
-
-
 # 用于在label内动态展示摄像头内容（摄像头嵌入控件）
-
 def video_loop():
     # success, img = camera.read()  # 从摄像头读取照片
     global success
     global img
     if success:
         cv2.waitKey(1)
-        cv2image = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
-        current_image = Image.fromarray(cv2image)  # 将图像转换成Image对象
-        imgtk = ImageTk.PhotoImage(image=current_image)
-        panel.imgtk = imgtk
-        panel.config(image=imgtk)
+        # 转换颜色从BGR到RGBA
+        cv2image = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+        # 将图像转换成Image对象
+        current_image = Image.fromarray(cv2image)
+        img_tk = ImageTk.PhotoImage(image=current_image)
+        panel.img_tk = img_tk
+        panel.config(image=img_tk)
         window.after(1, video_loop)
 
 
-video_loop()
+window = tk.Tk()
+# 窗口标题
+window.title('人脸识别考勤算法设计与实现')
+window.geometry('1000x610')
 
+# 在图形界面上设定标签，类似于一个提示窗口的作用
+var = tk.StringVar()
+label_control = tk.Label(window, textvariable=var, bg='#dee3e9', fg='black', font=('Arial', 12), width=50, height=4)
+label_control.pack()
+
+# 这是我自己写的列表控件样式
+var_content = tk.StringVar()
+button_a1 = tk.Label(window, justify='left', textvariable=var_content, font=('Arial', 16), width=70, height=20)
+button_a1.place(x=220, y=180)
+
+# 在窗口界面设置放置Button按键并绑定处理函数
+button_a1 = tk.Button(window, text='开始刷脸', font=('Arial', 12), width=10, height=2, command=scan_face_recognition)
+button_a1.place(x=800, y=200)
+
+button_b1 = tk.Button(window, text='录入人脸', font=('Arial', 12), width=10, height=2, command=enter_face_recognition)
+button_b1.place(x=800, y=300)
+
+button_b1 = tk.Button(window, text='退出', font=('Arial', 12), width=10, height=2, command=face_button_exit)
+button_b1.place(x=800, y=400)
+
+# 摄像头模块大小
+panel = tk.Label(window, width=500, height=350)
+# 摄像头模块的位置
+panel.place(x=10, y=140)
+window.config(cursor="arrow")
+
+video_loop()
 #  窗口循环，用于显示
 window.mainloop()
-
